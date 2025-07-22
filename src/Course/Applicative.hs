@@ -350,8 +350,7 @@ replicateA ::
     k a ->
     k (List a)
 replicateA n ka =
-  mapM (const ka) (take n infinity)
-  --sequence $ const ka <$> take n (infinity)
+  sequence (ka <$ take n infinity)
 
 {- | Filter a list with a predicate that produces an effect.
 
