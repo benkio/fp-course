@@ -12,6 +12,7 @@ import Course.Functor
 import Course.List
 import Course.Monad
 import Course.Optional
+import Data.Char (digitToInt)
 import qualified Data.Set as S
 import qualified Prelude as P
 
@@ -197,13 +198,13 @@ distinct ::
 distinct xs =
   eval (filtering (\x -> State (\d -> (S.notMember x d, S.insert x d))) xs) S.empty
 
-{- | A happy number is a positive integer, where the sum of the square of its digits eventually reaches 1 after repetition.
-In contrast, a sad number (not a happy number) is where the sum of the square of its digits never reaches 1
+{- | A happy number is a positive integer, where the sum of the squareSum of its digits eventually reaches 1 after repetition.
+In contrast, a sad number (not a happy number) is where the sum of the squareSum of its digits never reaches 1
 because it results in a recurring sequence.
 
 /Tip:/ Use `firstRepeat` with `produce`.
 
-/Tip:/ Use `join` to write a @square@ function.
+/Tip:/ Use `join` to write a @squareSum@ function.
 
 /Tip:/ Use library functions: @Optional#contains@, @Data.Char#digitToInt@.
 
@@ -218,9 +219,24 @@ False
 
 >>> isHappy 44
 True
+
+firstRepeat :: (Ord a) => List a -> Optional a
+produce :: (a -> a) -> a -> List a
+join :: Monad k => k (k a) -> k a
 -}
 isHappy ::
-    Integer ->
+    Int ->
     Bool
-isHappy =
-    error "todo: Course.State#isHappy"
+isHappy x =
+    firstRepeat allHappy == Full 1
+    where
+      allHappy = produce nextHappyValue x
+
+nextHappyValue :: Int -> Int
+nextHappyValue = squareSum . splitToDigits
+
+squareSum :: List Int -> Int
+squareSum xs = sum $ (P.^2) <$> xs
+
+splitToDigits :: Int -> List Int
+splitToDigits = map digitToInt . listh . show
