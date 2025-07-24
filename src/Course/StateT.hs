@@ -48,7 +48,7 @@ instance (Functor k) => Functor (StateT s k) where
         StateT s k a ->
         StateT s k b
     f <$> st =
-        StateT (\s -> (\(a, s') -> (f a, s')) <$> (runStateT st s))
+        StateT ((first f <$>) <$> runStateT st)
 
 {- | Implement the `Applicative` instance for @StateT s k@ given a @Monad k@.
 
@@ -79,11 +79,8 @@ instance (Monad k) => Applicative (StateT s k) where
         StateT s k b
     stfab <*> sta =
         StateT
-            ( \s ->
-                runStateT stfab s
-                    >>= ( \(fab, s') ->
-                            (\(a, s'') -> (fab a, s'')) <$> runStateT sta s'
-                        )
+            ( \s -> runStateT stfab s
+                >>= (\(fab, s') -> first fab <$> runStateT sta s')
             )
 
 {- | Implement the `Monad` instance for @StateT s k@ given a @Monad k@.
@@ -102,8 +99,7 @@ instance (Monad k) => Monad (StateT s k) where
         StateT s k b
     fastkb =<< stka =
         StateT
-            ( \s ->
-                runStateT stka s >>= \(a, s') -> runStateT (fastkb a) s'
+            ( \s -> runStateT stka s >>= \(a, s') -> runStateT (fastkb a) s'
             )
 
 -- | A `State'` is `StateT` specialised to the `ExactlyOne` functor.
@@ -118,7 +114,7 @@ ExactlyOne ((),1)
 state' ::
     (s -> (a, s)) ->
     State' s a
-state' f = StateT (\s -> ExactlyOne (f s))
+state' f = StateT (ExactlyOne . f)
 
 {- | Provide an unwrapper for `State'` values.
 
@@ -206,7 +202,7 @@ putT ::
     s ->
     StateT s k ()
 putT s =
-  StateT (\_ -> pure ((), s))
+    StateT (\_ -> pure ((), s))
 
 {- | Remove all duplicate elements in a `List`.
 
@@ -219,7 +215,7 @@ distinct' ::
     List a ->
     List a
 distinct' xs =
-  eval' (filtering (\x -> state' (\d -> (S.notMember x d, S.insert x d))) xs) S.empty
+    eval' (filtering (\x -> state' (\d -> (S.notMember x d, S.insert x d))) xs) S.empty
 
 {- | Remove all duplicate elements in a `List`.
 However, if you see a value greater than `100` in the list,
@@ -237,11 +233,24 @@ distinctF ::
     (Ord a, Num a) =>
     List a ->
     Optional (List a)
-distinctF =
-    error "todo: Course.StateT#distinctF"
+distinctF xs =
+    evalT
+        ( filtering
+            ( \x ->
+                getT >>= \s ->
+                    if x > 100
+                        then StateT (const Empty)
+                        else
+                            if S.member x s
+                                then StateT (\s' -> Full (False, s'))
+                                else putT (S.insert x s) >>= \_ -> StateT (\s' -> Full (True, s'))
+            )
+            xs
+        )
+        S.empty
 
 -- | An `OptionalT` is a functor of an `Optional` value.
-data OptionalT k a
+newtype OptionalT k a
     = OptionalT
     { runOptionalT ::
         k (Optional a)
@@ -257,8 +266,8 @@ instance (Functor k) => Functor (OptionalT k) where
         (a -> b) ->
         OptionalT k a ->
         OptionalT k b
-    (<$>) =
-        error "todo: Course.StateT (<$>)#instance (OptionalT k)"
+    f <$> oka =
+        OptionalT{runOptionalT = (f <$>) <$> runOptionalT oka}
 
 {- | Implement the `Applicative` instance for `OptionalT k` given a Monad k.
 
@@ -289,15 +298,16 @@ instance (Monad k) => Applicative (OptionalT k) where
     pure ::
         a ->
         OptionalT k a
-    pure =
-        error "todo: Course.StateT pure#instance (OptionalT k)"
+    pure a =
+        OptionalT{runOptionalT = pure (Full a)}
 
     (<*>) ::
         OptionalT k (a -> b) ->
         OptionalT k a ->
         OptionalT k b
-    (<*>) =
-        error "todo: Course.StateT (<*>)#instance (OptionalT k)"
+    otf <*> oa =
+        -- TODO: fix
+        OptionalT{runOptionalT = runOptionalT otf >>= \opf -> (opf <*>) <$> runOptionalT oa}
 
 {- | Implement the `Monad` instance for `OptionalT k` given a Monad k.
 
