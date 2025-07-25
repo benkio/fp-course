@@ -79,8 +79,9 @@ instance (Monad k) => Applicative (StateT s k) where
         StateT s k b
     stfab <*> sta =
         StateT
-            ( \s -> runStateT stfab s
-                >>= (\(fab, s') -> first fab <$> runStateT sta s')
+            ( \s ->
+                runStateT stfab s
+                    >>= (\(fab, s') -> first fab <$> runStateT sta s')
             )
 
 {- | Implement the `Monad` instance for @StateT s k@ given a @Monad k@.
@@ -305,9 +306,8 @@ instance (Monad k) => Applicative (OptionalT k) where
         OptionalT k (a -> b) ->
         OptionalT k a ->
         OptionalT k b
-    otf <*> oa =
-        -- TODO: fix
-        OptionalT{runOptionalT = runOptionalT otf >>= \opf -> (opf <*>) <$> runOptionalT oa}
+    OptionalT f <*> OptionalT a =
+        OptionalT (f >>= optional (\f' -> (f' <$>) <$> a) (pure Empty))
 
 {- | Implement the `Monad` instance for `OptionalT k` given a Monad k.
 
@@ -319,8 +319,8 @@ instance (Monad k) => Monad (OptionalT k) where
         (a -> OptionalT k b) ->
         OptionalT k a ->
         OptionalT k b
-    (=<<) =
-        error "todo: Course.StateT (=<<)#instance (OptionalT k)"
+    f =<< OptionalT a =
+        OptionalT (optional (runOptionalT . f) (pure Empty) =<< a)
 
 -- | A `Logger` is a pair of a list of log values (`[l]`) and an arbitrary value (`a`).
 data Logger l a
